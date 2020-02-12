@@ -4,7 +4,7 @@
 #include <string.h>
 
 void execCMD(char *path, char **args) {
-    
+
 }
 
 void getArgs(char *input, char **args) {
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
             getline(&line, &len, stdin);
             getArgs(line, args);
             if ((path = findPath(argv[1])) != NULL) {
-
+                fprintf(stdout, "got here\n");
             }
         }
     }
