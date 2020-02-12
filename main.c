@@ -6,7 +6,13 @@
 #include <errno.h>
 #include <wait.h>
 
-void execCMD(char *path, char **args) {
+typedef struct _arguments {
+    char *path;
+    char **args;
+    int numArgs;
+} arguments;
+
+void execCMD(char *path, arguments arg) {
     pid_t pid;
     int wstatus;
 
@@ -16,14 +22,14 @@ void execCMD(char *path, char **args) {
     }
 
     if (pid == 0) {
-        execv(path, args);
+        execv(path, arg.args);
     }
     else {
         wait(&wstatus);
     }
 }
 
-void getArgs(char *input, char **args) {
+void getArgs(char *input, arguments arg) {
     char *token;
     char *delim = " ";
 //    char **args = (char **) malloc(sizeof(char *));
@@ -33,63 +39,76 @@ void getArgs(char *input, char **args) {
     if (token[strlen(token) - 1] == '\n')
         token[strlen(token) - 1] = '\0';
     fprintf(stdout, "token = %s\n", token);
-    args[0] = strdup(token);
-    fprintf(stdout, "args[0] = %s\n", args[0]);
+    arg.args[0] = strdup(token);
+    fprintf(stdout, "args[0] = %s\n", arg.args[0]);
     while ((token = strtok(NULL, delim)) != NULL) {
         if (token[strlen(token) - 1] == '\n')
             token[strlen(token) - 1] = '\0';
         fprintf(stdout, "token = %s\n", token);
-        args[ii] = strdup(token);
-        fprintf(stdout, "args[%d] = %s\n",ii, args[ii]);
+        arg.args[ii] = strdup(token);
+        fprintf(stdout, "args[%d] = %s\n",ii, arg.args[ii]);
         ii++;
     }
+    arg.numArgs = ii;
 }
 
-char *findPath(char *arg) {
+char *findPath(arguments arg) {
     char *path = getenv("PATH");
     char *p = strdup(path);
-    char *token;
+    char *token = NULL;
     char *delim = ":";
     struct stat s;
-    char *execPath;
-    arg[strlen(arg)] = '\0';
+    char *execPath = (char *) malloc(strlen(path));
+//    arg[strlen(arg)] = '\0';
 
     fprintf(stdout, "PATH = %s\n", p);
     token = strtok(p, delim);
     while (token != NULL) {
         fprintf(stdout, "token = %s\n", token);
-        execPath = strdup(token);
+        strcpy(execPath, token);
         strcat(execPath, "/");
-        strcat(execPath, arg);
+        fprintf(stdout, "execPath = %s\n", execPath);
+        strcat(execPath, arg.args[0]);
         fprintf(stdout, "execPath = %s\n", execPath);
         if (stat(execPath, &s) != -1) {
-            fprintf(stdout, "%s is in %s\n",arg, execPath);
+            fprintf(stdout, "%s is in %s\n",arg.args[0], execPath);
+            arg.path = strdup(execPath);
             return execPath;
         }
-        if ((token = strtok(NULL, delim)) == NULL) {
-            break;
+        else {
+            fprintf(stdout, "stat == -1\n");
         }
+//        fprintf(stdout, "before memset\n");
         memset(execPath, 0, sizeof(*execPath));
+//        fprintf(stdout, "after memset\n");
+        token = strtok(NULL, delim);
     }
-    fprintf(stdout, "GOT HERE");
-    memset(execPath, 0, sizeof(execPath));
-    execPath = getcwd(NULL, 0);
-    strlcat(execPath, arg, sizeof(execPath));
-    if (stat(execPath, &s) != -1) {
-        fprintf(stdout, "%s is in %s\n",arg, execPath);
+    fprintf(stdout, "GOT HERE\n");
+//    memset(execPath, 0, sizeof(*execPath));
+//    fprintf(stdout, "after memset\n");
+//    cwd = getcwd(NULL, 0);
+//    fprintf(stdout, "cwd = %s\n", cwd);
+//    strlcat(cwd, arg, sizeof(cwd));
+//    execPath = "./";
+//    fprintf(stdout, "execPath = %s\n", execPath);
+//    strlcat(execPath, arg, )
+    if (stat(arg.args[0], &s) != -1) {
+        fprintf(stdout, "%s is in %s\n",arg.args[0], execPath);
+        arg.path = strdup(execPath);
         return execPath;
     }
-    fprintf(stdout, "ERROR: %s not found!\n", arg);
+    fprintf(stdout, "ERROR: %s not found!\n", arg.args[0]);
 
     return NULL;
 }
 
 int main(int argc, char *argv[]) {
-   char *path;
+   char *path = NULL;
    char *line = NULL;
    size_t len = 0;
-   char **args = (char **) malloc(sizeof(char *));
    char *cwd;
+   arguments *args = (arguments *) malloc(sizeof(arguments));
+   args->args = (char **) malloc(sizeof(char *));
 
     if (argc == 1) {
 #pragma clang diagnostic push
@@ -98,11 +117,11 @@ int main(int argc, char *argv[]) {
             cwd = getcwd(NULL, 0);
             fprintf(stdout, "%s>", cwd);
             getline(&line, &len, stdin);
-            getArgs(line, args);
-            if ((path = findPath(args[0])) != NULL) {
+            getArgs(line, *args);
+            if ((path = findPath(*args)) != NULL) {
                 fprintf(stdout, "got here\n");
                 fprintf(stdout, "path = %s\n", path);
-                execCMD(path, args);
+                execCMD(path, *args);
             }
         }
 #pragma clang diagnostic pop
