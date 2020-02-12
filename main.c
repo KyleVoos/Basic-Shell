@@ -4,13 +4,22 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <wait.h>
 
 void execCMD(char *path, char **args) {
     pid_t pid;
+    int wstatus;
 
-    if ((pid = fork()) < 0) {
+    if ((pid = fork()) == -1) {
         fprintf(stderr, "%s\n", strerror(errno));
         return;
+    }
+
+    if (pid == 0) {
+        execv(path, args);
+    }
+    else {
+        wait(&wstatus);
     }
 }
 
@@ -43,6 +52,7 @@ char *findPath(char *arg) {
     char *delim = ":";
     struct stat s;
     char *execPath;
+    arg[strlen(arg)] = '\0';
 
     fprintf(stdout, "PATH = %s\n", p);
     token = strtok(p, delim);
@@ -59,6 +69,7 @@ char *findPath(char *arg) {
         if ((token = strtok(NULL, delim)) == NULL) {
             break;
         }
+        memset(execPath, 0, sizeof(*execPath));
     }
     fprintf(stdout, "GOT HERE");
     memset(execPath, 0, sizeof(execPath));
