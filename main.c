@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <string.h>
+#include <bsd/string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <wait.h>
@@ -10,7 +10,7 @@ typedef struct _arguments {
     char *path;
     char **args;
     int numArgs;
-    int noWait;
+    int noWait; // For '&' flag
 } arguments;
 
 void freeMem(arguments *arg) {
@@ -72,80 +72,78 @@ void execCMD(arguments arg) {
 void getArgs(char *input, arguments *arg) {
     char *token;
     char *delim = " ";
-    int ii = 1;
+    int argsIndx = 1;
+    int maxArgs = 5;
 
     token = strtok(input, delim);
-    if (token[strlen(token) - 1] == '\n')
-        token[strlen(token) - 1] = '\0';
-    fprintf(stdout, "token = %s\n", token);
+    int lastTokIndx = strlen(token) - 1;
+    token[lastTokIndx] = (token[lastTokIndx] == '\n')? '\0': token[lastTokIndx];
     arg->args[0] = strdup(token);
-    fprintf(stdout, "args[0] = %s\n", arg->args[0]);
+    fprintf(stdout, "args[0] (token) = %s\n", arg->args[0]);
+
+    // Needs to check if there are 5
+
     while ((token = strtok(NULL, delim)) != NULL) {
-        if (token[strlen(token) - 1] == '\n')
-            token[strlen(token) - 1] = '\0';
+        if (maxArgs == 0) {// we're only accepting 5 args
+            fprintf(stderr,"Only accepting 5 arguments.\n");
+            break;
+        }
+
+        lastTokIndx = strlen(token) - 1;
+        token[lastTokIndx] = (token[lastTokIndx] == '\n')? '\0': token[lastTokIndx];
+        
         fprintf(stdout, "token = %s\n", token);
         if (strcmp(token, "&") == 0) {
             arg->noWait = 1;
         }
         else {
-            arg->args[ii] = strdup(token);
-            fprintf(stdout, "args[%d] = %s\n", ii, arg->args[ii]);
-            ii++;
+            arg->args[argsIndx] = strdup(token);
+            fprintf(stdout, "args[%d] = %s\n", argsIndx, arg->args[argsIndx]);
+            argsIndx++;
         }
+        maxArgs--;
     }
-    arg->numArgs = ii;
+    arg->numArgs = argsIndx;
 }
 
 char *findPath(arguments *arg) {
     char *path = getenv("PATH");
-    char *p = strdup(path);
+    int pathLen = strlen(path);
     char *token = NULL;
-    char *delim = ":";
-    struct stat s;
+    char delim[] = ":";
     char *execPath = NULL;
+    struct stat s;
 
-    fprintf(stdout, "PATH = %s\n", p);
-    token = strtok(p, delim);
-    while (token != NULL) {
-        execPath = (char *) malloc(strlen(path));
-//        fprintf(stdout, "token = %s\n", token);
-        strlcpy(execPath, token, sizeof(execPath));
-        strcat(execPath, "/");
-//        fprintf(stdout, "execPath = %s\n", execPath);
-        strcat(execPath, arg->args[0]);
-//        fprintf(stdout, "execPath = %s\n", execPath);
-        if (stat(execPath, &s) != -1) {
-            fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
-            arg->path = strdup(execPath);
-            free(p);
-            free(execPath);
-            return execPath;
-        }
-//        else {
-//            fprintf(stdout, "stat == -1\n");
-//        }
-//        memset(execPath, 0, sizeof(*execPath));
-        free(execPath);
-        token = strtok(NULL, delim);
-    }
-//    fprintf(stdout, "GOT HERE\n");
-//    memset(execPath, 0, sizeof(*execPath));
-//    fprintf(stdout, "after memset\n");
-//    cwd = getcwd(NULL, 0);
-//    fprintf(stdout, "cwd = %s\n", cwd);
-//    strlcat(cwd, arg, sizeof(cwd));
-//      execPath = "./";
-//      fprintf(stdout, "execPath = %s\n", execPath);
-//      strlcat(execPath, arg->args[0], sizeof(execPath));
+    // Just check the command and not reference it to path yet
     if (stat(arg->args[0], &s) != -1) {
         fprintf(stdout, "%s is in %s\n",arg->args[0], getcwd(NULL, 0));
         arg->path = strdup(execPath);
         return execPath;
     }
-//    free(execPath);
-    free(p);
-    fprintf(stdout, "ERROR: %s not found!\n", arg->args[0]);
 
+    // Concat our cmd to each token of path until we find
+    // the location of the cmd (if there is one)
+    token = strtok(path, delim);
+    while (token != NULL) {
+        execPath = (char *) malloc(pathLen *sizeof(char));
+        strlcpy(execPath, token, sizeof(execPath));
+        strcat(execPath, "/");
+    //    fprintf(stdout, "execPath = %s\n", execPath);
+        strcat(execPath, arg->args[0]);
+    //    fprintf(stdout, "execPath = %s\n", execPath);
+
+        // If we find the location of the actual command
+        if (stat(execPath, &s) != -1) {
+            fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
+            arg->path = strdup(execPath);
+            free(execPath);
+            return arg->path;
+        }
+        free(execPath);
+        token = strtok(NULL, delim);
+    }
+
+    fprintf(stdout, "ERROR: %s not found!\n", arg->args[0]);
     return NULL;
 }
 
@@ -154,8 +152,8 @@ int main(int argc, char *argv[]) {
    char *line = NULL;
    size_t len = 0;
    char *cwd;
-   arguments *args = (arguments *) malloc(sizeof(arguments));
-   args->args = (char **) malloc(sizeof(char *));
+   arguments *args = (arguments *) malloc(sizeof(arguments)); // Making Head of LL
+   args->args = (char **) malloc(5 *sizeof(char *)); // Set table to be size 5 (requirement)
 
     if (argc == 1) {
 #pragma clang diagnostic push
@@ -163,7 +161,8 @@ int main(int argc, char *argv[]) {
         while (1) {
             args->noWait = 0;
             cwd = getcwd(NULL, 0);
-            fprintf(stdout, "ehs: %s> ", cwd);
+            fprintf(stdout, "=============\nCWD: %s \n", cwd);
+            fprintf(stdout, "esh> ");
             getline(&line, &len, stdin);
             getArgs(line, args);
             if (strcmp(args->args[0], "exit") == 0) {
@@ -173,12 +172,14 @@ int main(int argc, char *argv[]) {
                 free(args);
                 return 0;
             }
+
+            // Extra feature
             if (strcmp(args->args[0], "cd") == 0) {
                 changeDir(*args);
             }
             else if ((path = findPath(args)) != NULL) {
 //                fprintf(stdout, "got here\n");
-                fprintf(stdout, "path = %s\n", path);
+                fprintf(stdout, "Got the command\n");
                 execCMD(*args);
             }
             free(line);
