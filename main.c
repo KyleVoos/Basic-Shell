@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <bsd/string.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <wait.h>
@@ -106,8 +106,27 @@ void getArgs(char *input, arguments *arg) {
     arg->numArgs = argsIndx;
 }
 
+// char *newStrCat(char *str1, char *str2) {
+//     int str1Len = strlen(str1), str2Len = strlen(str2);
+//     int totalLen = str1Len + str2Len;
+//     char *newStr = (char *) malloc(sizeof(char) * (totalLen));
+//     for (int i = 0, k = 0; i < totalLen; i++) {
+//         char c = (k < str1Len)? str1[k]:str2[k];
+//         if (c == '\0' || c == '\n') {
+//             k++;
+//             if (k >= totalLen) {
+
+//             }
+//         } else {
+//             newStr[i] = c;
+//         }
+//     }
+// }
+
 char *findPath(arguments *arg) {
-    char *path = getenv("PATH");
+    char *path = strdup(getenv("PATH"));
+    // Path's not the same everytime, do ls then ls -l
+    printf("**************\n%s\n**************\n", path);
     int pathLen = strlen(path);
     char *token = NULL;
     char delim[] = ":";
@@ -116,8 +135,10 @@ char *findPath(arguments *arg) {
 
     // Just check the command and not reference it to path yet
     if (stat(arg->args[0], &s) != -1) {
-        fprintf(stdout, "%s is in %s\n",arg->args[0], getcwd(NULL, 0));
+        execPath = strdup(getcwd(NULL, 0));
+        fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
         arg->path = strdup(execPath);
+        free(path);
         return execPath;
     }
 
@@ -126,23 +147,25 @@ char *findPath(arguments *arg) {
     token = strtok(path, delim);
     while (token != NULL) {
         execPath = (char *) malloc(pathLen *sizeof(char));
-        strlcpy(execPath, token, sizeof(execPath));
+        *execPath = 0;
+        strncpy(execPath, token, sizeof(token) + sizeof(arg->args[0]));
         strcat(execPath, "/");
-    //    fprintf(stdout, "execPath = %s\n", execPath);
+       fprintf(stdout, "tok (%d) = %s\n", (int)sizeof(token), token);
         strcat(execPath, arg->args[0]);
-    //    fprintf(stdout, "execPath = %s\n", execPath);
+       fprintf(stdout, "execPath for %s = %s\n", arg->args[0], execPath);
 
         // If we find the location of the actual command
         if (stat(execPath, &s) != -1) {
             fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
             arg->path = strdup(execPath);
             free(execPath);
+            free(path);
             return arg->path;
         }
-        free(execPath);
+        // free(execPath);
         token = strtok(NULL, delim);
     }
-
+    free(path);
     fprintf(stdout, "ERROR: %s not found!\n", arg->args[0]);
     return NULL;
 }
