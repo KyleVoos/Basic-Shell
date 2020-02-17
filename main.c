@@ -98,22 +98,27 @@ void getArgs(char *input, arguments *arg) {
 }
 
 char *findPath(arguments *arg) {
+    fprintf(stdout, "start of find path\n");
     char *path = getenv("PATH");
-    char *p = strdup(path);
+    fprintf(stdout, "before strlen\n");
+    char p[strlen(path) + 1];
+    fprintf(stdout, "after strlen\n");
     char *token = NULL;
     char *delim = ":";
     struct stat s;
+    fprintf(stdout, "before malloc\n");
     char *execPath = (char *) malloc(sizeof(char));
-    char temp[strlen(arg->args[0]) + 2];
+    char temp[100] = {0};
     size_t len = 0;
-
+    fprintf(stdout, "before memset\n");
     memset(temp, 0, sizeof(temp));
-
-    strncpy(temp, "/", strlen(arg->args[0]) + 1);
-    strncat(temp, arg->args[0], strlen(arg->args[0]) + 1);
+    strcpy(p, path);
+    p[strlen(p)] = '\0';
+    strncpy(temp, "/", 99);
+    strncat(temp, arg->args[0], 99);
     temp[strlen(temp)] = '\0';
     fprintf(stdout, "temp = %s\n", temp);
-    fprintf(stdout, "PATH = %s\n", p);
+//    fprintf(stdout, "PATH = %s\n", p);
     token = strtok(p, delim);
     len = strlen(token);
     while (token != NULL) {
@@ -128,7 +133,7 @@ char *findPath(arguments *arg) {
         if (stat(execPath, &s) != -1) {
             fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
             arg->path = strdup(execPath);
-            free(p);
+//            free(p);
             free(execPath);
             return arg->path;
         }
@@ -147,10 +152,11 @@ char *findPath(arguments *arg) {
     if (stat(cwd, &s) != -1) {
         fprintf(stdout, "%s is in %s\n",arg->args[0], getcwd(NULL, 0));
         arg->path = strdup(cwd);
+//        free(p);
         return execPath;
     }
     free(execPath);
-    free(p);
+//    free(p);
     fprintf(stdout, "ERROR: %s not found!\n", arg->args[0]);
 
     return NULL;
