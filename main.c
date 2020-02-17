@@ -191,7 +191,8 @@ int main(int argc, char *argv[]) {
                     free(args->path);
                 }
             }
-            free(line);
+            if (strlen(line) > 1)
+                free(line);
 //            free(cwd);
         }
     }
