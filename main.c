@@ -7,16 +7,18 @@
 #include <wait.h>
 #include <ctype.h>
 
+char *removeWS(char *str);
+
 // strcut to hold all of the variables we need
 typedef struct _arguments {
     char *path; // this holds the path for what we are trying to exec
     char **args;    // array that holds the cmd in the first arg and all of the optional arguments
     int numArgs;    // the number of arguments
     int noWait;     // flag for if & was detected in input
-} arguments;
+} usrIn;
 
 // function to free the memory in the struct
-void freeMem(arguments *arg) {
+void freeMem(usrIn *arg) {
 
     // loop through the array and clear everything in it
     for (int ii = 0; ii < arg->numArgs; ii++) {
@@ -28,12 +30,12 @@ void freeMem(arguments *arg) {
 }
 
 // function to implement cd, should be self explanatory
-void changeDir(arguments arg) {
+void changeDir(usrIn arg) {
 
     if (arg.numArgs == 1)
         arg.args[1] = strdup("~/home");
     else if (arg.numArgs > 2) {
-        fprintf(stdout, "-esh: cd: too many arguments\n");
+        fprintf(stderr, "-esh: cd: too many arguments\n");
         return;
     }
     if (chdir(arg.args[1]) == -1)
@@ -42,11 +44,11 @@ void changeDir(arguments arg) {
 }
 
 // function that execs the cmd from user input
-void execCMD(arguments arg) {
+void execCMD(usrIn arg) {
     pid_t pid;
     int wstatus;
 
-    fprintf(stdout, "number of arguments = %d\n", arg.numArgs);
+    // fprintf(stdout, "number of arguments = %d\n", arg.numArgs);
 
     // fork a new child process
     if ((pid = fork()) == -1) {
@@ -73,10 +75,10 @@ void execCMD(arguments arg) {
 }
 
 // this fucntion gets the arguments from the user input and adds them to the struct
-void getArgs(char *input, arguments *arg) {
+void getArgs(char *input, usrIn *arg) {
     char *token;
     char *delim = " ";
-    int ii = 1;
+    int arg_indx = 1;
 
     // use strtok to split the input string on ' '
     token = strtok(input, delim);
@@ -88,7 +90,7 @@ void getArgs(char *input, arguments *arg) {
 
     // dup the first token into the first position of the array of arguments
     arg->args[0] = strdup(token);
-    fprintf(stdout, "args[0] = %s\n", arg->args[0]);
+    // fprintf(stdout, "args[0] = %s\n", arg->args[0]);
 
     // continue looping through the rest of the user input
     while ((token = strtok(NULL, delim)) != NULL) {
@@ -99,16 +101,16 @@ void getArgs(char *input, arguments *arg) {
 //        fprintf(stdout, "token = %s\n", token);
         if (strcmp(token, "&") == 0) arg->noWait = 1; // set the noWait flag if & is detected
         else { // if & isn't detected dup the token into the array
-            arg->args[ii] = strdup(token);
-            fprintf(stdout, "args[%d] = %s\n", ii, arg->args[ii]);
-            ii++;
+            arg->args[arg_indx] = strdup(token);
+            // fprintf(stdout, "args[%d] = %s\n", ii, arg->args[ii]);
+            arg_indx++;
         }
     }
-    arg->numArgs = ii;  // finally set the number of arguemnts to ii, used for clearing memory
+    arg->numArgs = arg_indx;  // finally set the number of arguemnts to ii, used for clearing memory
 }
 
 // attempts to find the path from the PATH environment variable
-char *findPath(arguments *arg) {
+char *findPath(usrIn *arg) {
     // get the PATH environment variable
     char *path = strdup(getenv("PATH"));
     char *token = NULL;
@@ -138,10 +140,10 @@ char *findPath(arguments *arg) {
         strncpy(execPath, token, (len + tempLen));
         strncat(execPath, temp, (len + tempLen));
         execPath[strlen(execPath)] = '\0';
-        fprintf(stdout, "execPath = %s\n", execPath);
+        // fprintf(stdout, "execPath = %s\n", execPath);
         // use stat on exec path, it will return 0 if this is the correct path to the executable in arg->args[0]
         if (stat(execPath, &s) != -1) {
-            fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
+            // fprintf(stdout, "%s is in %s\n",arg->args[0], execPath);
             arg->path = strdup(execPath);
             free(path);
             free(execPath);
@@ -175,11 +177,11 @@ char *findPath(arguments *arg) {
 }
 
 int main(int argc, char *argv[]) {
-   char *line = NULL;
+   char *user_input = NULL;
    size_t len = 0;
    char *cwd;
    // variable for the struct and allocate memory for it
-   arguments *args = (arguments *) malloc(sizeof(arguments));
+   usrIn *args = (usrIn *) malloc(sizeof(usrIn));
    // allocate memory for the array that will hold the arguments
    args->args = (char **) malloc(6 * sizeof(char *));
 
@@ -187,15 +189,16 @@ int main(int argc, char *argv[]) {
         while (1) {
             // set the no wait flag to 0
             args->noWait = 0;
-            fprintf(stdout, "ehs> ");
-            getline(&line, &len, stdin);
-            if (strcmp(&line[0], "\n") != 0) {
+            fprintf(stdout, "\nehs> ");
+            getline(&user_input, &len, stdin);
+            char *parsed_input = removeWS(user_input);
+            if (strlen(parsed_input) > 0) {
                 // after getting the user input get the arguments from it
-                getArgs(line, args);
+                getArgs(parsed_input, args);
                 // check if the first argument is 'exit'
                 if (strcmp(args->args[0], "exit") == 0) {
                     // free all the memory and terminate execution
-                    free(line);
+                    free(user_input);
                     freeMem(args);
                     free(args->args);
                     args->args = NULL;
@@ -209,18 +212,37 @@ int main(int argc, char *argv[]) {
                 }
                 // if the first argument isn't 'exit' or 'cd' we need to try to find the path to where the arguments executable is
                 else if (findPath(args) != NULL) {   // if we were able to find the path, now exec it
-                    fprintf(stdout, "args->path = %s\n", args->path);
+                    // fprintf(stdout, "args->path = %s\n", args->path);
                     // exec the command and free the memory
                     execCMD(*args);
                     freeMem(args);
                     free(args->path);
                 }
             }
-            if (strlen(line) > 1) {
-                free(line);
+            if (strlen(user_input) > 1) {
+                free(user_input);
                 len = 0;
             }
         }
     }
     return 0;
+}
+
+char *removeWS(char *str) {
+    while( isspace(*(++str)) ); // Trim leading space
+ 
+    if( (*str) == '\0' ) {
+            return str;
+    }
+
+    int len = strlen(str);
+    len--;
+
+    while ( isspace(*(str +len)) ) {
+            len--;
+    }
+
+    *(str + len + 1) = '\0';
+
+    return (str-1);
 }
