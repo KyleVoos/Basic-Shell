@@ -7,7 +7,6 @@
 #include <wait.h>
 #include <ctype.h>
 
-char *removeWS(char *str);
 
 // strcut to hold all of the variables we need
 typedef struct _arguments {
@@ -16,6 +15,25 @@ typedef struct _arguments {
     int numArgs;    // the number of arguments
     int noWait;     // flag for if & was detected in input
 } usrIn;
+
+char *removeWS(char *str) {
+    while( isspace(*(++str)) ); // Trim leading space
+
+    if( (*str) == '\0' ) {
+        return str;
+    }
+
+    size_t len = strlen(str);
+    len--;
+
+    while ( isspace(*(str +len)) ) {
+        len--;
+    }
+
+    *(str + len + 1) = '\0';
+
+    return (str-1);
+}
 
 // function to free the memory in the struct
 void freeMem(usrIn *arg) {
@@ -107,6 +125,7 @@ void getArgs(char *input, usrIn *arg) {
         }
     }
     arg->numArgs = arg_indx;  // finally set the number of arguemnts to ii, used for clearing memory
+    arg->args[arg_indx] = NULL;
 }
 
 // attempts to find the path from the PATH environment variable
@@ -126,9 +145,7 @@ char *findPath(usrIn *arg) {
     strncat(temp, arg->args[0], (cmdLen + 1));
     temp[strlen(temp)] = '\0';  // null terminate temp
     size_t tempLen = strlen(temp);  // get the size of temp for the dynamic memory allocation for execPath
-
 //    fprintf(stdout, "PATH = %s\n", path);
-
     token = strtok(path, delim);
     size_t len = strlen(token);
 
@@ -226,23 +243,4 @@ int main(int argc, char *argv[]) {
         }
     }
     return 0;
-}
-
-char *removeWS(char *str) {
-    while( isspace(*(++str)) ); // Trim leading space
- 
-    if( (*str) == '\0' ) {
-            return str;
-    }
-
-    int len = strlen(str);
-    len--;
-
-    while ( isspace(*(str +len)) ) {
-            len--;
-    }
-
-    *(str + len + 1) = '\0';
-
-    return (str-1);
 }
