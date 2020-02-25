@@ -1,2 +1,2 @@
 all:
-	gcc -o esh main.c -lbsd
+	gcc -o esh main.c -Wall -Werror
