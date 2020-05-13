@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
         while (1) {
             // set the no wait flag to 0
             args->noWait = 0;
-            fprintf(stdout, "\nehs> ");
+            fprintf(stdout, "\nesh> ");
             getline(&user_input, &len, stdin);
             char *parsed_input = removeWS(user_input);
             if (strlen(parsed_input) > 0) {
